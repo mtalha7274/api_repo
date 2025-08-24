@@ -1,7 +1,7 @@
 name: api_repo
 description: "A Flutter package for Api caching."
 version: 0.0.1
-homepage:
+repository: "https://github.com/mtalha7274/api_repo"
 
 environment:
   sdk: ^3.9.0
