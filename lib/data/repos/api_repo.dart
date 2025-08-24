@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import '../../core/utils/helpers.dart';
-import '../../injection_container.dart';
+import '../../core/services/app_services.dart';
 import '../managers/cache_policy.dart';
 import '../managers/custom_cache_manager.dart';
 
@@ -19,9 +19,6 @@ enum ResponseOrigin { cache, network }
 /// - Execution time logging
 ///
 mixin ApiRepo {
-  /// Local DB cache manager
-  final CustomCacheManager _cacheManager = sl<CustomCacheManager>();
-
   /// Auto refresh controllers
   final Map<String, Timer> _autoRefreshTimers = {};
 
@@ -167,9 +164,12 @@ mixin ApiRepo {
     bool showLogs = false,
   }) async {
     // Internal helpers
+    final CustomCacheManager cacheManager =
+        await AppServices.instance.cacheManager;
+
     T? readCacheSync({bool allowExpired = false}) {
       final sw = Stopwatch()..start();
-      final dynamic cachedRaw = _cacheManager.getCache(
+      final dynamic cachedRaw = cacheManager.getCache(
         key: key,
         allowExpired: allowExpired,
       );
@@ -224,7 +224,7 @@ mixin ApiRepo {
           sw.stop();
           if (showLogs) printLog('🌐 Network in ${sw.elapsedMs()}');
           // Cache raw response
-          unawaited(_cacheManager.setCache(key: key, value: raw, ttl: ttl));
+          unawaited(cacheManager.setCache(key: key, value: raw, ttl: ttl));
           // Cast for consumer
           return raw;
         } catch (e) {

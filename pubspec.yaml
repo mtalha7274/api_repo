@@ -1,6 +1,6 @@
 name: api_repo
-description: "A Flutter package for Api caching."
-version: 0.0.1
+description: "Flutter package providing a simple, configurable API caching layer with pluggable storage and cache policies to speed up network calls and reduce redundant requests."
+version: 0.0.2
 repository: "https://github.com/mtalha7274/api_repo"
 
 environment:
@@ -10,7 +10,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  get_it: ^8.2.0
   shared_preferences: ^2.5.3
 
 dev_dependencies:

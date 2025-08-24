@@ -1,12 +1,9 @@
 import 'package:api_repo/data/managers/cache_policy.dart';
 import 'package:flutter/material.dart';
-import 'package:api_repo/injection_container.dart';
 import 'package:api_repo/api_repo.dart';
 import 'package:dio/dio.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await initializeDependencies();
   runApp(const MaterialApp(home: ApiRepoExample()));
 }
 
