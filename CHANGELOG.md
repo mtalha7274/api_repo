@@ -1,3 +1,8 @@
+## 0.0.4
+
+- Added custom storage manager support (LocalStorageManager)
+- Updated documentation
+
 ## 0.0.3
 
 - Resolved issue in example

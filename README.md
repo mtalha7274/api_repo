@@ -130,6 +130,7 @@ void onRequest<T>({
   int? rateLimitPerSecond,
   CachePolicy? cachePolicy,
   bool? showLogs,
+  LocalStorageManager? storageManager,
 });
 ```
 
@@ -140,6 +141,7 @@ void onRequest<T>({
 - **Rate limiting**: limit calls per second per key. When exceeded, the request waits before firing.
 - **Auto‑refresh**: pass an interval to re‑fetch periodically. Re‑scheduling the same key replaces the prior timer.
 - **Logging**: enable to print timing info for cache and network operations.
+ - **Storage manager**: optionally inject a custom `LocalStorageManager` per call; when omitted, the repo’s `defaultStorageManager` is used if set, otherwise the package default (`SharedPreferences`).
 
 `ResponseOrigin` values:
 
@@ -154,6 +156,34 @@ Supported cache policies (`CachePolicy`):
 - `cacheFirst`: return cache when present; otherwise hit network
 - `networkFirst`: try network; fall back to cache on failure
 - `cacheThenNetwork`: immediately return cache when present, then also deliver a network update when it completes
+
+---
+
+### Bring your own storage (custom LocalStorageManager)
+
+Implement `LocalStorageManager` and pass it to your repo:
+
+```dart
+class MyStorageManager implements LocalStorageManager {
+  @override
+  FutureOr<String?> getString({required String key}) {}
+
+  @override
+  Future<void> setString({required String key, required String value}) async {}
+
+  @override
+  Future<void> delete({required String key}) async {}
+
+  @override
+  Future<void> deleteAll() async {}
+}
+
+class MyRepo with ApiRepo {
+  MyRepo() {
+    defaultStorageManager = MyStorageManager();
+  }
+}
+```
 
 ---
 
@@ -172,6 +202,9 @@ class MyRepo with ApiRepo {
     maxRetries = 2; // null means no retry
     retryDelay = const Duration(seconds: 1);
     rateLimitPerSecond = 5; // null disables rate limiting
+
+    // Optional: set a custom storage layer for this repo
+    // defaultStorageManager = MyStorageManager(/* dependencies */);
   }
 }
 ```

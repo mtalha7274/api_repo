@@ -4,6 +4,7 @@ import '../../core/utils/helpers.dart';
 import '../../core/services/app_services.dart';
 import '../managers/cache_policy.dart';
 import '../managers/custom_cache_manager.dart';
+import '../managers/local_storage_manager.dart';
 
 /// Source of the data delivered to onData callback
 /// - cache: came from local cache
@@ -19,6 +20,9 @@ enum ResponseOrigin { cache, network }
 /// - Execution time logging
 ///
 mixin ApiRepo {
+  /// Local storage manager
+  LocalStorageManager? defaultStorageManager;
+
   /// Auto refresh controllers
   final Map<String, Timer> _autoRefreshTimers = {};
 
@@ -119,6 +123,7 @@ mixin ApiRepo {
     int? rateLimitPerSecond,
     CachePolicy? cachePolicy,
     bool? showLogs,
+    LocalStorageManager? storageManager,
   }) {
     final callerFunctionName = _getCallerFunctionName();
     key = key ?? callerFunctionName;
@@ -128,6 +133,8 @@ mixin ApiRepo {
         autoRefreshInterval ?? defaultAutoRefreshInterval;
     final Duration? effectiveTtl = ttl ?? defaultTtl;
     final CachePolicy effectiveCachePolicy = cachePolicy ?? defaultCachePolicy;
+    final LocalStorageManager? effectiveStorageManager =
+        storageManager ?? defaultStorageManager;
 
     if (effectiveShowLogs) {
       printLog('🔑 key: $key, caller: $callerFunctionName');
@@ -146,6 +153,7 @@ mixin ApiRepo {
         rateLimitPerSecondOverride: rateLimitPerSecond,
         cachePolicy: effectiveCachePolicy,
         showLogs: effectiveShowLogs,
+        storageManagerOverride: effectiveStorageManager,
       ),
     );
   }
@@ -162,10 +170,11 @@ mixin ApiRepo {
     int? rateLimitPerSecondOverride,
     CachePolicy cachePolicy = CachePolicy.cacheThenNetwork,
     bool showLogs = false,
+    LocalStorageManager? storageManagerOverride,
   }) async {
-    // Internal helpers
-    final CustomCacheManager cacheManager =
-        await AppServices.instance.cacheManager;
+    final CustomCacheManager cacheManager = storageManagerOverride != null
+        ? CustomCacheManager(storageManagerOverride)
+        : await AppServices.instance.cacheManager;
 
     FutureOr<T?> readCache({bool allowExpired = false}) async {
       final sw = Stopwatch()..start();
