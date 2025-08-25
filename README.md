@@ -24,17 +24,10 @@ The core idea: write your domain repositories as usual, mix in `ApiRepo`, and ca
 
 ### Install
 
-Add the dependency to your app's `pubspec.yaml`:
-
-```yaml
-dependencies:
-  api_repo: ^0.0.1
-```
-
-Then run:
+In your terminal, run:
 
 ```bash
-flutter pub get
+flutter pub add api_repo
 ```
 
 ---

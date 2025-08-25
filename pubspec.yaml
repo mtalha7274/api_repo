@@ -1,6 +1,6 @@
 name: api_repo
 description: "Flutter package providing a simple, configurable API caching layer with pluggable storage and cache policies to speed up network calls and reduce redundant requests."
-version: 0.0.2
+version: 0.0.3
 repository: "https://github.com/mtalha7274/api_repo"
 
 environment:
