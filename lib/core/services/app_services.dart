@@ -1,7 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/managers/custom_cache_manager.dart';
-import '../../data/managers/local_store_manager.dart';
+import '../../data/managers/local_storage_manager.dart';
 import '../../data/managers/shared_preference_manager.dart';
 
 class AppServices {

@@ -1,6 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'local_store_manager.dart';
+import 'local_storage_manager.dart';
 
 class SharedPreferenceManager implements LocalStorageManager {
   final SharedPreferences _preferences;

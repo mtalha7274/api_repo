@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'local_store_manager.dart';
+import 'local_storage_manager.dart';
 
 /// Lightweight key-value cache persisted on top of LocalStorageManager.
 ///

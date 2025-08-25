@@ -1,4 +1,6 @@
 ## 0.0.3
+
+- Resolved issue in example
 - Updated documentation
 
 ## 0.0.2
