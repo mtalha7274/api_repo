@@ -23,6 +23,10 @@ class _ApiRepoExampleState extends State<ApiRepoExample> {
     super.initState();
     _api.fetchTodo(
       onData: (data, origin) {
+        if (data == null) {
+          setState(() => _data = "Error: No data received");
+          return;
+        }
         setState(
           () => _data =
               "Title: ${data['title']}\n Completed: ${data['completed']}",
@@ -44,19 +48,27 @@ class TodoApi with ApiRepo {
   }
 
   void fetchTodo({
-    required void Function(Map<String, dynamic> data, ResponseOrigin origin)
+    required void Function(Map<String, dynamic>? data, ResponseOrigin origin)
     onData,
   }) {
-    onRequest<Map<String, dynamic>>(
+    onRequest<Map<String, dynamic>?>(
       cachePolicy: CachePolicy.cacheThenNetwork,
       ttl: const Duration(hours: 1), // Local: set TTL to 1 hour
-      request: () async {
-        final response = await Dio().get(
-          'https://jsonplaceholder.typicode.com/todos/1',
-        );
-        return Map<String, dynamic>.from(response.data as Map);
-      },
+      request: _fetchTodoApi,
       onData: onData,
     );
+  }
+
+  Future<Map<String, dynamic>?> _fetchTodoApi() async {
+    try {
+      final response = await Dio().get(
+        'https://jsonplaceholder.typicode.com/todos/1',
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+      return response.data;
+    } catch (e) {
+      debugPrint("Error: $e");
+      return null;
+    }
   }
 }

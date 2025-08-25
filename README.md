@@ -38,28 +38,38 @@ flutter pub add api_repo
 
 ```dart
 import 'package:api_repo/api_repo.dart';
+import 'package:api_repo/data/managers/cache_policy.dart';
 import 'package:dio/dio.dart'; // or any client you prefer
+import 'package:flutter/foundation.dart';
 
 class TodoApi with ApiRepo {
   TodoApi() {
     defaultShowLogs = true; // optional: enable logs globally for this repo
-    // You can also set other global defaults here (see Advanced config)
   }
 
   void fetchTodo({
-    required void Function(Map<String, dynamic> data, ResponseOrigin origin)
+    required void Function(Map<String, dynamic>? data, ResponseOrigin origin)
         onData,
   }) {
-    onRequest<Map<String, dynamic>>(
+    onRequest<Map<String, dynamic>?>(
       cachePolicy: CachePolicy.cacheThenNetwork,
       ttl: const Duration(hours: 1),
-      request: () async {
-        final response = await Dio()
-            .get('https://jsonplaceholder.typicode.com/todos/1');
-        return Map<String, dynamic>.from(response.data as Map);
-      },
+      request: _fetchTodoApi,
       onData: onData,
     );
+  }
+
+  Future<Map<String, dynamic>?> _fetchTodoApi() async {
+    try {
+      final response = await Dio().get(
+        'https://jsonplaceholder.typicode.com/todos/1',
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (e) {
+      debugPrint('Error: $e');
+      return null;
+    }
   }
 }
 ```
@@ -82,6 +92,10 @@ class _ApiRepoExampleState extends State<ApiRepoExample> {
     super.initState();
     _api.fetchTodo(
       onData: (data, origin) {
+        if (data == null) {
+          setState(() => _data = 'Error: No data received');
+          return;
+        }
         setState(() => _data =
             'Title: ${data['title']}\n Completed: ${data['completed']}');
       },
