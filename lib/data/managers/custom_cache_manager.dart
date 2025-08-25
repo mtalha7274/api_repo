@@ -46,8 +46,11 @@ class CustomCacheManager {
   ///   (always fresh).
   ///
   /// Returns the parsed JSON if possible; otherwise returns the raw string.
-  dynamic getCache({required String key, bool allowExpired = false}) {
-    final String? jsonStr = _localStorageManager.getString(key: key);
+  Future<dynamic> getCache({
+    required String key,
+    bool allowExpired = false,
+  }) async {
+    final String? jsonStr = await _localStorageManager.getString(key: key);
     if (jsonStr == null) return null;
 
     final Map<String, dynamic> decoded = jsonDecode(jsonStr);

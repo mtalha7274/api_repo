@@ -167,9 +167,9 @@ mixin ApiRepo {
     final CustomCacheManager cacheManager =
         await AppServices.instance.cacheManager;
 
-    T? readCacheSync({bool allowExpired = false}) {
+    FutureOr<T?> readCache({bool allowExpired = false}) async {
       final sw = Stopwatch()..start();
-      final dynamic cachedRaw = cacheManager.getCache(
+      final dynamic cachedRaw = await cacheManager.getCache(
         key: key,
         allowExpired: allowExpired,
       );
@@ -253,7 +253,7 @@ mixin ApiRepo {
 
       switch (cachePolicy) {
         case CachePolicy.cacheOnly:
-          final T? cached = readCacheSync(allowExpired: false);
+          final T? cached = await readCache(allowExpired: false);
           if (cached != null) {
             onData(cached, ResponseOrigin.cache);
           }
@@ -265,7 +265,7 @@ mixin ApiRepo {
           break;
 
         case CachePolicy.cacheFirst:
-          final T? cached = readCacheSync(allowExpired: false);
+          final T? cached = await readCache(allowExpired: false);
           if (cached != null) {
             onData(cached, ResponseOrigin.cache);
           } else {
@@ -279,13 +279,13 @@ mixin ApiRepo {
             final T value = (await fetchNetwork()) as T;
             onData(value, ResponseOrigin.network);
           } catch (_) {
-            final T? cached = readCacheSync(allowExpired: true);
+            final T? cached = await readCache(allowExpired: true);
             if (cached != null) onData(cached, ResponseOrigin.cache);
           }
           break;
 
         case CachePolicy.cacheThenNetwork:
-          final T? cached = readCacheSync(allowExpired: false);
+          final T? cached = await readCache(allowExpired: false);
           if (cached != null) {
             // Synchronous delivery for immediate UI update
             onData(cached, ResponseOrigin.cache);
