@@ -1,3 +1,8 @@
+## 0.0.5
+
+- `onRequest` now returns `Future<T?>` with optional `onData` for one-time or streaming usage
+- Added `onError` callback
+
 ## 0.0.4
 
 - Added custom storage manager support (LocalStorageManager)

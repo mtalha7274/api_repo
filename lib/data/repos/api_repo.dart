@@ -53,70 +53,21 @@ mixin ApiRepo {
   /// Makes a unified request that handles caching, optional serialization, timing, optional
   /// auto-refreshing, rate-limiting and graceful retry logic.
   ///
-  /// This function provides:
-  /// - Automatic cache lookup (with optional transformation).
-  /// - Caching of API responses (memory + optional disk).
-  /// - Optional API Auto-Refresh at a fixed interval.
-  /// - Execution time logging (optional, in Debug mode).
-  /// - Graceful fallback and error state wrapping.
+  /// Returns a [Future<T?>] containing the first result (from cache or network depending on
+  /// the [cachePolicy]). Users who only need a one-time result can simply `await` this method.
+  /// Users who want continuous updates (e.g. with auto-refresh) should provide [onData].
   ///
-  /// Parameters:
+  /// [onData] is optional. When provided, it is called for every data delivery (cache hit,
+  /// network response, auto-refresh tick). When omitted, data is still returned via the Future.
   ///
-  /// [key]
-  /// - *(Optional)* A string key used to read/write cache.
-  /// - If omitted, the caller function's name will be used automatically as the key.
-  ///
-  /// [autoRefreshInterval]
-  /// - *(Optional)* Defaults to `30 seconds`.
-  /// - Time interval between consecutive auto-refresh API calls.
-  /// - If not null, auto-refresh is considered enabled.
-  ///
-  /// [request]
-  /// - *(Required)* The actual asynchronous API call to be executed.
-  /// - Should return a raw `dynamic` value (e.g., JSON, Map, List, etc.).
-  ///
-  /// [ttl]
-  /// - *(Optional)* Duration to keep cached value fresh on disk. If null, the entry does not auto-expire.
-  ///
-  /// [maxRetries]
-  /// - *(Optional)* Number of retry attempts if the API call fails.
-  /// - `null` (default) or `0` means no retry.
-  /// - Negative values are invalid and will throw.
-  ///
-  /// [retryDelay]
-  /// - *(Optional)* Delay between retries. Increases linearly per attempt (i.e., 1s, 2s, 3s...).
-  ///
-  /// [rateLimitPerSecond]
-  /// - *(Optional)* Max number of API calls allowed per second. Defaults to `null` (no limit).
-  ///
-  /// [cachePolicy]
-  /// - *(Optional)* Cache behavior strategy:
-  ///   - cacheOnly: return cached or throw if missing
-  ///   - cacheFirst: return cached if present; otherwise fetch
-  ///   - cacheThenNetwork: return cached immediately; then fetch on next call/auto-refresh
-  ///   - networkFirst: try network; fallback to cached (fresh/stale) on failure
-  ///   - networkOnly: always hit network
-  /// - Default: `cacheThenNetwork`.
-  ///
-  /// [showLogs]
-  /// - *(Optional)* When true, logs key, caller, cache time, API time, and relative speed.
-  ///
-  /// ---
-  ///
-  /// Returns:
-  ///
-  /// Calls [onData] with results from cache and/or network based on [cachePolicy].
-  ///
-  /// onData's second parameter indicates the origin (cache or network).
-  ///
-  /// NOTE: This method is intentionally fire-and-forget (void). Use callbacks to receive data.
-  void onRequest<T>({
+  /// [onError] is optional. When provided, it is called with the error and its [StackTrace]
+  /// whenever a failure occurs (network, cache, auto-refresh, etc.).
+  Future<T?> onRequest<T>({
     String? key,
     Duration? autoRefreshInterval,
-
-    /// The request must return the same type as `T` (e.g., String, Map, List, etc.)
     required FutureOr<T> Function() request,
-    required void Function(T data, ResponseOrigin origin) onData,
+    void Function(T data, ResponseOrigin origin)? onData,
+    void Function(Object error, StackTrace stackTrace)? onError,
     Duration? ttl,
     int? maxRetries,
     Duration? retryDelay,
@@ -140,29 +91,27 @@ mixin ApiRepo {
       printLog('🔑 key: $key, caller: $callerFunctionName');
     }
 
-    // Fire-and-forget; rely on callbacks for results
-    unawaited(
-      _request<T>(
-        key,
-        autoRefreshInterval: effectiveAutoRefreshInterval,
-        request: request,
-        onData: onData,
-        ttl: effectiveTtl,
-        maxRetriesOverride: maxRetries,
-        retryDelayOverride: retryDelay,
-        rateLimitPerSecondOverride: rateLimitPerSecond,
-        cachePolicy: effectiveCachePolicy,
-        showLogs: effectiveShowLogs,
-        storageManagerOverride: effectiveStorageManager,
-      ),
+    return _request<T>(
+      key,
+      autoRefreshInterval: effectiveAutoRefreshInterval,
+      request: request,
+      onData: onData,
+      onError: onError,
+      ttl: effectiveTtl,
+      maxRetriesOverride: maxRetries,
+      retryDelayOverride: retryDelay,
+      rateLimitPerSecondOverride: rateLimitPerSecond,
+      cachePolicy: effectiveCachePolicy,
+      showLogs: effectiveShowLogs,
+      storageManagerOverride: effectiveStorageManager,
     );
   }
 
-  /// Core request executor handling cache policies, retries, rate-limit and auto-refresh.
-  Future<void> _request<T>(
+  Future<T?> _request<T>(
     String key, {
     required FutureOr<T> Function() request,
-    required void Function(T data, ResponseOrigin origin) onData,
+    void Function(T data, ResponseOrigin origin)? onData,
+    void Function(Object error, StackTrace stackTrace)? onError,
     Duration? autoRefreshInterval,
     Duration? ttl,
     int? maxRetriesOverride,
@@ -175,6 +124,13 @@ mixin ApiRepo {
     final CustomCacheManager cacheManager = storageManagerOverride != null
         ? CustomCacheManager(storageManagerOverride)
         : await AppServices.instance.cacheManager;
+
+    T? result;
+
+    void deliver(T data, ResponseOrigin origin) {
+      result ??= data;
+      onData?.call(data, origin);
+    }
 
     FutureOr<T?> readCache({bool allowExpired = false}) async {
       final sw = Stopwatch()..start();
@@ -199,7 +155,6 @@ mixin ApiRepo {
     }
 
     Future<T?> fetchNetwork() async {
-      // Rate limiting
       final int? rate = rateLimitPerSecondOverride ?? rateLimitPerSecond;
       if (rate.isEnabled) {
         final minIntervalMs = (1000 / rate!).floor();
@@ -221,7 +176,6 @@ mixin ApiRepo {
           'maxRetries cannot be negative. Received: $effectiveMaxRetries',
         );
       }
-      // `null` => no retry, treat as 0
       final int retries = (effectiveMaxRetries ?? 0).clamp(0, 10);
       final Duration baseDelay = retryDelayOverride ?? retryDelay;
 
@@ -232,9 +186,7 @@ mixin ApiRepo {
           final T raw = await request();
           sw.stop();
           if (showLogs) printLog('🌐 Network in ${sw.elapsedMs()}');
-          // Cache raw response
           unawaited(cacheManager.setCache(key: key, value: raw, ttl: ttl));
-          // Cast for consumer
           return raw;
         } catch (e) {
           sw.stop();
@@ -256,66 +208,64 @@ mixin ApiRepo {
       }
     }
 
-    // Execute per policy
     try {
       if (showLogs) printLog('📦 Policy: ${cachePolicy.name}');
 
       switch (cachePolicy) {
         case CachePolicy.cacheOnly:
           final T? cached = await readCache(allowExpired: false);
-          if (cached != null) {
-            onData(cached, ResponseOrigin.cache);
-          }
+          if (cached != null) deliver(cached, ResponseOrigin.cache);
           break;
 
         case CachePolicy.networkOnly:
           final T value = (await fetchNetwork()) as T;
-          onData(value, ResponseOrigin.network);
+          deliver(value, ResponseOrigin.network);
           break;
 
         case CachePolicy.cacheFirst:
           final T? cached = await readCache(allowExpired: false);
           if (cached != null) {
-            onData(cached, ResponseOrigin.cache);
+            deliver(cached, ResponseOrigin.cache);
           } else {
             final T value = (await fetchNetwork()) as T;
-            onData(value, ResponseOrigin.network);
+            deliver(value, ResponseOrigin.network);
           }
           break;
 
         case CachePolicy.networkFirst:
           try {
             final T value = (await fetchNetwork()) as T;
-            onData(value, ResponseOrigin.network);
-          } catch (_) {
+            deliver(value, ResponseOrigin.network);
+          } catch (e, st) {
+            onError?.call(e, st);
             final T? cached = await readCache(allowExpired: true);
-            if (cached != null) onData(cached, ResponseOrigin.cache);
+            if (cached != null) deliver(cached, ResponseOrigin.cache);
           }
           break;
 
         case CachePolicy.cacheThenNetwork:
           final T? cached = await readCache(allowExpired: false);
           if (cached != null) {
-            // Synchronous delivery for immediate UI update
-            onData(cached, ResponseOrigin.cache);
-          }
-          // Fire and also provide network update when ready
-          unawaited(
-            fetchNetwork()
-                .then((value) {
-                  if (value != null) onData(value, ResponseOrigin.network);
-                })
-                .catchError((e) {
+            deliver(cached, ResponseOrigin.cache);
+            unawaited(
+              Future<void>(() async {
+                try {
+                  final T? value = await fetchNetwork();
+                  if (value != null) deliver(value, ResponseOrigin.network);
+                } catch (e, st) {
                   if (showLogs) printLog('⚠️  Network update failed: $e');
-                  throw e;
-                }),
-          );
+                  onError?.call(e, st);
+                }
+              }),
+            );
+          } else {
+            final T value = (await fetchNetwork()) as T;
+            deliver(value, ResponseOrigin.network);
+          }
           break;
       }
 
-      // Setup auto-refresh if requested
       if (autoRefreshInterval.isEnabled) {
-        // Cancel any previous timer for this key
         _autoRefreshTimers[key]?.cancel();
         _autoRefreshTimers[key] = Timer.periodic(autoRefreshInterval!, (
           _,
@@ -323,17 +273,19 @@ mixin ApiRepo {
           if (showLogs) printLog('🔄 Auto-refresh tick for $key');
           try {
             final T? value = await fetchNetwork();
-            if (value != null) onData(value, ResponseOrigin.network);
-          } catch (e) {
+            if (value != null) deliver(value, ResponseOrigin.network);
+          } catch (e, st) {
             if (showLogs) printLog('⚠️  Auto-refresh failed: $e');
-            rethrow;
+            onError?.call(e, st);
           }
         });
       }
-    } catch (e) {
+    } catch (e, st) {
       if (showLogs) printLog('⚠️  Request error: $e');
-      rethrow;
+      onError?.call(e, st);
     }
+
+    return result;
   }
 
   String _getCallerFunctionName() {
